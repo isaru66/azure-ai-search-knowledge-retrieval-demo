@@ -25,11 +25,71 @@ interface KBViewCodeModalProps {
   agentName: string
   messages: Message[]
   searchEndpoint: string
+  runtimeSettings?: {
+    outputMode?: 'answerSynthesis' | 'extractiveData'
+    reasoningEffort?: 'low' | 'medium' | 'high'
+    globalHeaders?: Record<string, string>
+    knowledgeSourceParams?: Array<{
+      knowledgeSourceName: string
+      kind: string
+      alwaysQuerySource?: boolean
+      includeReferences?: boolean
+      includeReferenceSourceData?: boolean
+      rerankerThreshold?: number | null
+      maxSubQueries?: number | null
+      headers?: Record<string, string>
+    }>
+  }
 }
 
-export function KBViewCodeModal({ isOpen, onClose, agentId, agentName, messages, searchEndpoint }: KBViewCodeModalProps) {
+export function KBViewCodeModal({ isOpen, onClose, agentId, agentName, messages, searchEndpoint, runtimeSettings }: KBViewCodeModalProps) {
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null)
   const [selectedLanguage, setSelectedLanguage] = React.useState('curl')
+  const [showSecrets, setShowSecrets] = React.useState(false)
+
+  // Sensitive header detection & masking utilities (used only for display; never mutate real settings)
+  const isSensitiveHeader = (key: string) => {
+    const lower = key.toLowerCase()
+    return (
+      ['authorization', 'x-ms-query-source-authorization', 'api-key', 'x-api-key'].includes(lower) ||
+      lower.endsWith('token') ||
+      lower.endsWith('key') ||
+      lower.includes('secret')
+    )
+  }
+
+  const maskHeaderValue = (key: string, value: string) => {
+    if (!value) return value
+    if (!isSensitiveHeader(key) || showSecrets) return value
+    // Preserve Bearer prefix if present
+    const bearerMatch = value.match(/^(Bearer\s+)(.+)$/i)
+    if (bearerMatch) {
+      const token = bearerMatch[2]
+      if (token.length <= 8) return `${bearerMatch[1]}****`
+      return `${bearerMatch[1]}${token.slice(0,4)}...${token.slice(-4)}`
+    }
+    if (value.length <= 8) return '****'
+    return `${value.slice(0,4)}...${value.slice(-4)}`
+  }
+
+  const maskHeadersObject = (headers?: Record<string, string>) => {
+    if (!headers) return headers
+    const masked: Record<string, string> = {}
+    Object.entries(headers).forEach(([k,v]) => {
+      masked[k] = maskHeaderValue(k, v)
+    })
+    return masked
+  }
+
+  const buildMaskedKnowledgeSourceParams = (params?: KBViewCodeModalProps['runtimeSettings'] extends infer R ? R extends { knowledgeSourceParams?: infer K } ? K : any : any) => {
+    if (!params) return []
+    return params.map((p: any) => ({
+      ...p,
+      headers: maskHeadersObject(p.headers)
+    }))
+  }
+
+  const getMaskedGlobalHeaders = () => maskHeadersObject(runtimeSettings?.globalHeaders)
 
   // Lock body scroll while modal open to prevent double scrollbars (background + modal)
   React.useEffect(() => {
@@ -72,9 +132,73 @@ export function KBViewCodeModal({ isOpen, onClose, agentId, agentName, messages,
 
   // Generate cURL code
   const generateCurlCode = () => {
-    const messagesJson = JSON.stringify(apiMessages, null, 2)
+    // Build the request body exactly as the API does it
+    const requestBody: any = {
+      messages: apiMessages
+    }
+
+    // Add global headers if present
+    if (runtimeSettings?.globalHeaders && Object.keys(runtimeSettings.globalHeaders).filter(k => k && runtimeSettings.globalHeaders![k]).length > 0) {
+      requestBody.globalHeaders = runtimeSettings.globalHeaders
+    }
+
+    // Add output mode if specified
+    if (runtimeSettings?.outputMode) {
+      requestBody.outputMode = runtimeSettings.outputMode
+    }
+
+    // Add reasoning effort if specified (use correct API property name)
+    if (runtimeSettings?.reasoningEffort) {
+      requestBody.retrievalReasoningEffort = {
+        kind: runtimeSettings.reasoningEffort
+      }
+    }
+
+    // Add knowledge source params if present (match actual API behavior)
+    if (runtimeSettings?.knowledgeSourceParams && runtimeSettings.knowledgeSourceParams.length > 0) {
+      const filteredParams = runtimeSettings.knowledgeSourceParams.map(param => {
+        const result: any = {
+          knowledgeSourceName: param.knowledgeSourceName,
+          kind: param.kind
+        }
+
+        // Only include boolean fields if they are true (API requirement)
+        if (param.alwaysQuerySource === true) result.alwaysQuerySource = true
+        if (param.includeReferences === true) result.includeReferences = true
+        if (param.includeReferenceSourceData === true) result.includeReferenceSourceData = true
+        
+        // Include numeric fields if they exist
+        if (param.rerankerThreshold !== undefined && param.rerankerThreshold !== null) {
+          result.rerankerThreshold = param.rerankerThreshold
+        }
+        if (param.maxSubQueries !== undefined && param.maxSubQueries !== null) {
+          result.maxSubQueries = param.maxSubQueries
+        }
+        
+        // Include headers if they exist and are not empty
+        if (param.headers && Object.keys(param.headers).filter(k => k && param.headers![k]).length > 0) {
+          result.headers = param.headers
+        }
+
+        return result
+      })
+
+      if (filteredParams.length > 0) {
+        requestBody.knowledgeSourceParams = filteredParams
+      }
+    }
+
+    // Apply masking to headers for display
+    if (requestBody.globalHeaders) {
+      requestBody.globalHeaders = getMaskedGlobalHeaders()
+    }
+    if (requestBody.knowledgeSourceParams) {
+      requestBody.knowledgeSourceParams = buildMaskedKnowledgeSourceParams(requestBody.knowledgeSourceParams)
+    }
+
+    const requestBodyJson = JSON.stringify(requestBody, null, 2)
       .split('\n')
-      .join('\n    ')
+      .join('\n  ')
 
     return `# Retrieve from knowledge agent using REST API
 # This is the actual conversation from your playground session
@@ -82,9 +206,7 @@ export function KBViewCodeModal({ isOpen, onClose, agentId, agentName, messages,
 curl -X POST "${searchEndpoint}/knowledgebases/${agentId}/retrieve?api-version=2025-11-01-preview" \\
   -H "Content-Type: application/json" \\
   -H "api-key: \${AZURE_SEARCH_API_KEY}" \\
-  -d '{
-  "messages": ${messagesJson}
-}'
+  -d '${requestBodyJson}'
 
 # Response includes:
 # - Generated answer from the agent
@@ -99,6 +221,53 @@ curl -X POST "${searchEndpoint}/knowledgebases/${agentId}/retrieve?api-version=2
           idx === 0 ? line : `    ${line}`
         ).join('\n')
       : '[\n        {\n            "role": "user",\n            "content": [{"type": "text", "text": "Your question here"}]\n        }\n    ]'
+
+    // Build request body dict matching actual API structure
+    let requestBodyParts = ['    "messages": messages']
+
+    // Add global headers
+    if (runtimeSettings?.globalHeaders && Object.keys(runtimeSettings.globalHeaders).filter(k => k && runtimeSettings.globalHeaders![k]).length > 0) {
+      const globalHeadersStr = JSON.stringify(getMaskedGlobalHeaders(), null, 4)
+        .split('\n').map((line, idx) => idx === 0 ? line : `    ${line}`).join('\n')
+      requestBodyParts.push(`    "globalHeaders": ${globalHeadersStr}`)
+    }
+
+    // Add output mode
+    if (runtimeSettings?.outputMode) {
+      requestBodyParts.push(`    "outputMode": "${runtimeSettings.outputMode}"`)
+    }
+
+    // Add reasoning effort (use correct API property)
+    if (runtimeSettings?.reasoningEffort) {
+      requestBodyParts.push(`    "retrievalReasoningEffort": {"kind": "${runtimeSettings.reasoningEffort}"}`)
+    }
+
+    // Add knowledge source params matching actual API behavior
+    if (runtimeSettings?.knowledgeSourceParams && runtimeSettings.knowledgeSourceParams.length > 0) {
+      const paramsStr = runtimeSettings.knowledgeSourceParams.map(param => {
+        const maskedHeaders = maskHeadersObject(param.headers)
+        const lines = [`        {\n            "knowledgeSourceName": "${param.knowledgeSourceName}"`,
+                       `            "kind": "${param.kind}"`]
+        if (param.alwaysQuerySource === true) lines.push(`            "alwaysQuerySource": True`)
+        if (param.includeReferences === true) lines.push(`            "includeReferences": True`)
+        if (param.includeReferenceSourceData === true) lines.push(`            "includeReferenceSourceData": True`)
+        if (param.rerankerThreshold !== undefined && param.rerankerThreshold !== null) {
+          lines.push(`            "rerankerThreshold": ${param.rerankerThreshold}`)
+        }
+        if (param.maxSubQueries !== undefined && param.maxSubQueries !== null) {
+          lines.push(`            "maxSubQueries": ${param.maxSubQueries}`)
+        }
+        if (maskedHeaders && Object.keys(maskedHeaders).filter(k => k && maskedHeaders![k]).length > 0) {
+          lines.push(`            "headers": ${JSON.stringify(maskedHeaders)}`)
+        }
+        return lines.join(',\n') + '\n        }'
+      }).join(',\n')
+      requestBodyParts.push(`    "knowledgeSourceParams": [\n${paramsStr}\n    ]`)
+    }
+
+    const requestBodyStr = requestBodyParts.length > 1 
+      ? '{\n' + requestBodyParts.join(',\n') + '\n}'
+      : '{"messages": messages}'
 
     return `# pip install azure-search-documents==11.7.0b1
 import os
@@ -116,10 +285,13 @@ client = SearchAgentClient(endpoint, AzureKeyCredential(api_key))
 # ${messages.length > 0 ? `${messages.length} message(s) in history` : 'Start with your first question'}
 messages = ${messagesStr}
 
+# Build request body (matches actual API structure)
+request_body = ${requestBodyStr}
+
 # Retrieve from agent
 response = client.agents.retrieve(
     agent_name=agent_id,
-    body={"messages": messages}
+    body=request_body
 )
 
 # Process response
@@ -158,6 +330,49 @@ if response.activity:
         ).join('\n')
       : '[\n    {\n      role: "user" as const,\n      content: [{ type: "text", text: "Your question here" }]\n    }\n  ]'
 
+    // Build request body matching actual API structure
+    let requestBodyParts = ['messages']
+
+    if (runtimeSettings?.globalHeaders && Object.keys(runtimeSettings.globalHeaders).filter(k => k && runtimeSettings.globalHeaders![k]).length > 0) {
+      const globalHeadersStr = JSON.stringify(getMaskedGlobalHeaders(), null, 2)
+        .split('\n').map((line, idx) => idx === 0 ? line : `  ${line}`).join('\n')
+      requestBodyParts.push(`globalHeaders: ${globalHeadersStr}`)
+    }
+
+    if (runtimeSettings?.outputMode) {
+      requestBodyParts.push(`outputMode: "${runtimeSettings.outputMode}"`)
+    }
+
+    if (runtimeSettings?.reasoningEffort) {
+      requestBodyParts.push(`retrievalReasoningEffort: { kind: "${runtimeSettings.reasoningEffort}" }`)
+    }
+
+    if (runtimeSettings?.knowledgeSourceParams && runtimeSettings.knowledgeSourceParams.length > 0) {
+      const paramsArr = runtimeSettings.knowledgeSourceParams.map(param => {
+        const maskedHeaders = maskHeadersObject(param.headers)
+        const props = [`knowledgeSourceName: "${param.knowledgeSourceName}"`, `kind: "${param.kind}"`]
+        if (param.alwaysQuerySource === true) props.push('alwaysQuerySource: true')
+        if (param.includeReferences === true) props.push('includeReferences: true')
+        if (param.includeReferenceSourceData === true) props.push('includeReferenceSourceData: true')
+        if (param.rerankerThreshold !== undefined && param.rerankerThreshold !== null) {
+          props.push(`rerankerThreshold: ${param.rerankerThreshold}`)
+        }
+        if (param.maxSubQueries !== undefined && param.maxSubQueries !== null) {
+          props.push(`maxSubQueries: ${param.maxSubQueries}`)
+        }
+        if (maskedHeaders && Object.keys(maskedHeaders).filter(k => k && maskedHeaders![k]).length > 0) {
+          props.push(`headers: ${JSON.stringify(maskedHeaders)}`)
+        }
+        return `    { ${props.join(', ')} }`
+      }).join(',\n')
+
+      requestBodyParts.push(`knowledgeSourceParams: [\n${paramsArr}\n  ]`)
+    }
+
+    const requestBody = requestBodyParts.length === 1 
+      ? '{ messages }' 
+      : `{\n    ${requestBodyParts.join(',\n    ')}\n  }`
+
     return `// npm install @azure/search-documents@12.0.0-beta.9
 import { SearchAgentClient, AzureKeyCredential } from "@azure/search-documents";
 
@@ -172,12 +387,10 @@ const client = new SearchAgentClient(endpoint, new AzureKeyCredential(apiKey));
 // ${messages.length > 0 ? `${messages.length} message(s) in history` : 'Start with your first question'}
 const messages = ${messagesStr};
 
-// Retrieve from agent
+// Retrieve from agent (matches actual API structure)
 async function retrieveFromAgent() {
   try {
-    const response = await client.agents.retrieve(agentId, {
-      messages
-    });
+    const response = await client.agents.retrieve(agentId, ${requestBody});
 
     // Process response
     if (response.response && response.response.length > 0) {
@@ -244,6 +457,56 @@ ${contentFormatted}
                 }
             }`
 
+    // Build request properties matching actual API structure
+    let requestProperties = ['Messages = messages']
+
+    if (runtimeSettings?.globalHeaders && Object.keys(runtimeSettings.globalHeaders).filter(k => k && runtimeSettings.globalHeaders![k]).length > 0) {
+      const headersEntries = Object.entries(getMaskedGlobalHeaders() || {})
+        .filter(([k, v]) => k && v)
+        .map(([k, v]) => `        { ${JSON.stringify(k)}, ${JSON.stringify(v)} }`)
+        .join(',\n')
+      requestProperties.push(`GlobalHeaders = new Dictionary<string, string>\n    {\n${headersEntries}\n    }`)
+    }
+
+    if (runtimeSettings?.outputMode) {
+      requestProperties.push(`OutputMode = "${runtimeSettings.outputMode}"`)
+    }
+
+    if (runtimeSettings?.reasoningEffort) {
+      requestProperties.push(`RetrievalReasoningEffort = new ReasoningEffort { Kind = "${runtimeSettings.reasoningEffort}" }`)
+    }
+
+    if (runtimeSettings?.knowledgeSourceParams && runtimeSettings.knowledgeSourceParams.length > 0) {
+      const paramsFormatted = runtimeSettings.knowledgeSourceParams.map(param => {
+        const props = [
+          `KnowledgeSourceName = ${JSON.stringify(param.knowledgeSourceName)}`,
+          `Kind = ${JSON.stringify(param.kind)}`
+        ]
+        if (param.alwaysQuerySource === true) props.push('AlwaysQuerySource = true')
+        if (param.includeReferences === true) props.push('IncludeReferences = true')
+        if (param.includeReferenceSourceData === true) props.push('IncludeReferenceSourceData = true')
+        if (param.rerankerThreshold !== undefined && param.rerankerThreshold !== null) {
+          props.push(`RerankerThreshold = ${param.rerankerThreshold}`)
+        }
+        if (param.maxSubQueries !== undefined && param.maxSubQueries !== null) {
+          props.push(`MaxSubQueries = ${param.maxSubQueries}`)
+        }
+        const maskedHeaders = maskHeadersObject(param.headers)
+        if (maskedHeaders && Object.keys(maskedHeaders).filter(k => k && maskedHeaders![k]).length > 0) {
+          const headers = Object.entries(maskedHeaders)
+            .filter(([k, v]) => k && v)
+            .map(([k, v]) => `                { ${JSON.stringify(k)}, ${JSON.stringify(v)} }`)
+            .join(',\n')
+          props.push(`Headers = new Dictionary<string, string>\n            {\n${headers}\n            }`)
+        }
+        return `        new KnowledgeSourceParam\n        {\n            ${props.join(',\n            ')}\n        }`
+      }).join(',\n')
+
+      requestProperties.push(`KnowledgeSourceParams = new List<KnowledgeSourceParam>\n    {\n${paramsFormatted}\n    }`)
+    }
+
+    const requestPropertiesStr = requestProperties.join(',\n    ')
+
     return `// NuGet: Azure.Search.Documents -Version 12.0.0-beta.8
 using Azure;
 using Azure.Search.Documents;
@@ -263,10 +526,10 @@ var messages = new List<Message>
 ${messagesCode}
 };
 
-// Retrieve from agent
+// Retrieve from agent (matches actual API structure)
 var request = new RetrieveRequest
 {
-    Messages = messages
+    ${requestPropertiesStr}
 };
 
 RetrieveResponse response = await client.Agents.RetrieveAsync(agentId, request);
@@ -336,6 +599,55 @@ ${contentItems}
                         .setText("Your question here")
                 ))`
 
+    // Build request matching actual API structure
+    let requestChain = ['.setMessages(messages)']
+
+    if (runtimeSettings?.globalHeaders && Object.keys(runtimeSettings.globalHeaders).filter(k => k && runtimeSettings.globalHeaders![k]).length > 0) {
+      const headersMap = Object.entries(getMaskedGlobalHeaders() || {})
+        .filter(([k, v]) => k && v)
+        .map(([k, v]) => `map.put(${JSON.stringify(k)}, ${JSON.stringify(v)});`)
+        .join('\n            ')
+      requestChain.push(`.setGlobalHeaders(new HashMap<String, String>() {{
+            ${headersMap}
+        }})`)
+    }
+
+    if (runtimeSettings?.outputMode) {
+      requestChain.push(`.setOutputMode("${runtimeSettings.outputMode}")`)
+    }
+
+    if (runtimeSettings?.reasoningEffort) {
+      requestChain.push(`.setRetrievalReasoningEffort(new ReasoningEffort().setKind("${runtimeSettings.reasoningEffort}"))`)
+    }
+
+    if (runtimeSettings?.knowledgeSourceParams && runtimeSettings.knowledgeSourceParams.length > 0) {
+      const paramsFormatted = runtimeSettings.knowledgeSourceParams.map(param => {
+        let paramChain = `new KnowledgeSourceParam()\n                .setKnowledgeSourceName(${JSON.stringify(param.knowledgeSourceName)})\n                .setKind(${JSON.stringify(param.kind)})`
+        if (param.alwaysQuerySource === true) paramChain += `\n                .setAlwaysQuerySource(true)`
+        if (param.includeReferences === true) paramChain += `\n                .setIncludeReferences(true)`
+        if (param.includeReferenceSourceData === true) paramChain += `\n                .setIncludeReferenceSourceData(true)`
+        if (param.rerankerThreshold !== undefined && param.rerankerThreshold !== null) {
+          paramChain += `\n                .setRerankerThreshold(${param.rerankerThreshold})`
+        }
+        if (param.maxSubQueries !== undefined && param.maxSubQueries !== null) {
+          paramChain += `\n                .setMaxSubQueries(${param.maxSubQueries})`
+        }
+        const maskedHeaders = maskHeadersObject(param.headers)
+        if (maskedHeaders && Object.keys(maskedHeaders).filter(k => k && maskedHeaders![k]).length > 0) {
+          const headers = Object.entries(maskedHeaders)
+            .filter(([k, v]) => k && v)
+            .map(([k, v]) => `h.put(${JSON.stringify(k)}, ${JSON.stringify(v)});`)
+            .join('\n                    ')
+          paramChain += `\n                .setHeaders(new HashMap<String, String>() {{\n                    ${headers}\n                }})`
+        }
+        return `            ${paramChain}`
+      }).join(',\n')
+
+      requestChain.push(`.setKnowledgeSourceParams(Arrays.asList(\n${paramsFormatted}\n        ))`)
+    }
+
+    const requestChainStr = requestChain.join('\n            ')
+
     return `// Maven: com.azure:azure-search-documents:11.8.0-beta.1
 import com.azure.core.credential.AzureKeyCredential;
 import com.azure.search.documents.SearchAgentClient;
@@ -343,6 +655,7 @@ import com.azure.search.documents.SearchAgentClientBuilder;
 import com.azure.search.documents.models.*;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 public class KnowledgeAgentExample {
@@ -362,9 +675,9 @@ public class KnowledgeAgentExample {
 ${messagesCode}
         );
 
-        // Retrieve from agent
+        // Retrieve from agent (matches actual API structure)
         RetrieveRequest request = new RetrieveRequest()
-            .setMessages(messages);
+            ${requestChainStr};
 
         RetrieveResponse response = client.getAgents()
             .retrieve(agentId, request);
@@ -455,6 +768,15 @@ ${messagesCode}
                 </SelectContent>
               </Select>
 
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSecrets(prev => !prev)}
+                  className="text-xs px-2 py-1 rounded border border-stroke-divider hover:bg-bg-subtle transition-colors"
+                  aria-pressed={showSecrets}
+                >
+                  {showSecrets ? 'Hide secrets' : 'Reveal secrets'}
+                </button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -473,6 +795,7 @@ ${messagesCode}
                   </>
                 )}
               </Button>
+              </div>
             </div>
 
             {/* Message count info */}
@@ -502,6 +825,11 @@ ${messagesCode}
               <pre className="bg-bg-subtle border border-stroke-divider rounded-md p-4 text-xs text-fg-default overflow-x-auto">
                 <code>{getCodeSnippet(selectedLanguage)}</code>
               </pre>
+              {!showSecrets && (
+                <div className="mt-2 text-[10px] text-fg-muted">
+                  Sensitive header values (tokens, keys) have been masked. Click "Reveal secrets" to show actual values. Do NOT commit real secrets to source control.
+                </div>
+              )}
             </div>
 
             {/* Environment variables note */}
@@ -511,6 +839,7 @@ ${messagesCode}
                 <div>• Set <code className="bg-bg-canvas px-1">AZURE_SEARCH_API_KEY</code> environment variable with your API key</div>
                 <div>• Service endpoint: <code className="bg-bg-canvas px-1">{searchEndpoint}</code></div>
                 <div>• Agent ID: <code className="bg-bg-canvas px-1">{agentId}</code></div>
+                <div className="text-[10px] pt-1 text-status-warning">Never hardcode secrets. Use environment variables or managed identity. Headers shown above are for reproducibility only.</div>
               </div>
             </div>
 

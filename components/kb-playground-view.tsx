@@ -926,6 +926,7 @@ export function KBPlaygroundView({ preselectedAgent }: KBPlaygroundViewProps) {
           agentName={selectedAgent.name}
           messages={messages}
           searchEndpoint={searchEndpoint}
+          runtimeSettings={runtimeSettings}
         />
       )}
     </div>

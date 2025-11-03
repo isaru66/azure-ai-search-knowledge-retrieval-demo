@@ -748,11 +748,6 @@ export function KBPlaygroundView({ preselectedAgent }: KBPlaygroundViewProps) {
                     <span className="text-sm text-fg-muted">•</span>
                     <span className="text-sm text-fg-muted">{selectedAgent.sources.length} source{selectedAgent.sources.length !== 1 && 's'}</span>
                   </div>
-                  {selectedAgent.description && (
-                    <p className="text-sm text-fg-muted leading-relaxed max-w-2xl">
-                      {selectedAgent.description}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>

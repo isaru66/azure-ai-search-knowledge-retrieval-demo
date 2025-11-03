@@ -8,19 +8,20 @@
 
 ## 📍 Scope & Location
 
-**Repository Root:** `/Users/farzadsunavala/Dev/azure-ai-search-knowledge-retrieval-demo`
+**Repository Root:** `c:\Dev\azure-ai-search-knowledge-retrieval-demo-main`
 
 **Git Information:**
 - Current Branch: `main`
 - Main Branch: `main` (use for PRs)
-- Untracked Files: `NOTEBOOK_SUMMARY.md`, `TEST_RESULTS.md`, `notebooks/`, `test_docs_01/`, `test_05_search_index.sh`, `test_notebooks.py`
+- Repository: `https://github.com/farzad528/azure-ai-search-knowledge-retrieval-demo`
 
 **What This Project Is:**
 - Production-ready Next.js application for Azure AI Search Knowledge Retrieval
-- Showcases Knowledge Bases (Azure AI Search Agents) and Foundry Agents (Azure AI Foundry Assistant Service)
+- Showcases Knowledge Bases (Azure AI Search direct queries) and Azure AI Foundry Agent Service integration
+- **No major technical architecture changes** - feature updates only
 - Frontend: Next.js 14 + React 18 + TypeScript + TailwindCSS
 - Backend: Next.js API Routes with Azure AI Search and Azure AI Foundry integration
-- Deployment: Vercel, Azure App Service, Docker
+- Deployment: Vercel (primary), Azure Static Web Apps, Azure App Service
 
 ---
 
@@ -31,17 +32,20 @@
 ├── app/                          # Next.js 14 App Router (✅ MODIFY)
 │   ├── api/                      # API routes for Azure services
 │   │   ├── agents/              # Knowledge Bases API endpoints
-│   │   ├── foundry/             # Foundry Assistants API endpoints
-│   │   ├── knowledge-bases/     # Legacy knowledge bases endpoints
+│   │   ├── agentsv2/            # Foundry Agents v2 API (placeholder for future integration)
+│   │   │   ├── connections/     # Remote Tool connections management
+│   │   │   ├── knowledge-bases/ # Knowledge Bases management for Agents v2
+│   │   │   └── responses/       # Single-call response API for Agents v2
+│   │   ├── knowledge-bases/     # Knowledge bases endpoints
 │   │   ├── knowledge-sources/   # Knowledge source management
 │   │   └── index-stats/         # Search index statistics
 │   ├── playground/              # Knowledge Bases playground pages
 │   ├── agents/                  # Foundry agents playground pages
 │   ├── knowledge/               # Knowledge base management pages
-│   ├── knowledge-bases/         # Legacy knowledge base pages
+│   ├── knowledge-bases/         # Knowledge base list pages
 │   ├── knowledge-sources/       # Knowledge source pages
 │   ├── agent-builder/           # Agent builder UI
-│   ├── test/                    # Test playground page
+│   ├── test/                    # ⭐ Test playground for direct KB queries on Search resource
 │   ├── layout.tsx               # Root layout
 │   ├── page.tsx                 # Landing page
 │   ├── error.tsx                # Global error boundary
@@ -81,12 +85,17 @@
 ├── notebooks/                   # Jupyter notebooks (⚠️ MODIFY WITH CAUTION)
 ├── test_docs_01/                # Test documents (⚠️ MODIFY WITH CAUTION)
 ├── scripts/                     # Build/deployment scripts (✅ MODIFY)
+├── specs/                       # Specification documents (⚠️ MODIFY WITH CAUTION)
+├── messages/                    # Message templates (✅ MODIFY)
+├── config/                      # Configuration files (✅ MODIFY)
+│   ├── conversation-starters.json        # Conversation starter templates
+│   └── conversation-starters.schema.json # JSON schema for starters
 │
 ├── node_modules/                # Dependencies (❌ DO NOT MODIFY)
 ├── .next/                       # Next.js build output (❌ DO NOT MODIFY)
 ├── .git/                        # Git internals (❌ DO NOT MODIFY)
-├── .claude/                     # Claude-specific config (❌ DO NOT MODIFY)
 ├── .devcontainer/               # Dev container config (❌ DO NOT MODIFY)
+├── .github/                     # GitHub Actions workflows (⚠️ MODIFY WITH CAUTION)
 │
 ├── package.json                 # Node.js dependencies (✅ MODIFY)
 ├── tsconfig.json                # TypeScript configuration (⚠️ MODIFY WITH CAUTION)
@@ -97,7 +106,14 @@
 ├── .env.example                 # Environment variable template (✅ MODIFY)
 ├── .env.local                   # Local environment variables (❌ DO NOT COMMIT)
 ├── README.md                    # Project documentation (⚠️ MODIFY WITH CAUTION)
-└── AGENTS.md                    # This file (✅ MODIFY)
+├── AGENTS.md                    # This file (✅ MODIFY)
+├── AZURE_DEPLOYMENT_GUIDE.md    # Azure Static Web Apps deployment guide (✅ MODIFY)
+├── VERCEL_DEPLOYMENT.md         # Vercel deployment guide (✅ MODIFY)
+├── QUICK_START_VERCEL.md        # Quick start for Vercel (✅ MODIFY)
+├── staticwebapp.config.json     # Azure Static Web Apps config (⚠️ MODIFY WITH CAUTION)
+├── vercel.json                  # Vercel deployment config (⚠️ MODIFY WITH CAUTION)
+├── deploy-to-azure.ps1          # PowerShell deployment script (✅ MODIFY)
+└── configure-env-vars.ps1       # Environment configuration script (✅ MODIFY)
 ```
 
 **Legend:**
@@ -216,20 +232,18 @@ npm run build
 
 # If build succeeds, manually test:
 # 1. Navigate to http://localhost:3000
-# 2. Test Knowledge Bases playground (/test)
-# 3. Test Foundry Agents playground (/agents)
-# 4. Test agent creation (/knowledge/create)
-# 5. Verify API routes respond correctly
+# 2. Test direct KB queries on Search resource (/test) ⭐ PRIMARY TEST PLAYGROUND
+# 3. Test Knowledge Bases management (/knowledge)
+# 4. Test Foundry Agents playground (/agents)
+# 5. Test agent creation and configuration
+# 6. Verify API routes respond correctly
 ```
 
-**Shell Test Scripts:**
-```bash
-# Test Azure AI Search index (custom script)
-./test_05_search_index.sh
-
-# Test Jupyter notebooks (Python script)
-python3 test_notebooks.py
-```
+**HTTP Test Files:**
+For API testing, the repository includes `.http` files for manual testing with REST clients:
+- `agentsv2-test.http` - Test Agents v2 API endpoints
+- `ka-demo.http`, `ka-foundry-test.http` - Knowledge Base API tests
+- `foundry-knowledge-*.http` - Foundry Knowledge integration tests
 
 ---
 
@@ -749,10 +763,104 @@ npm run build && npm start
 
 ---
 
+## 🎯 Key Features & Routes
+
+### **1. Test Playground (`/test`) ⭐ PRIMARY FEATURE**
+Direct Knowledge Base queries against Azure AI Search resource without Foundry integration.
+
+**Purpose:** Test and query knowledge bases directly on the Search resource for rapid experimentation and debugging.
+
+**Key Capabilities:**
+- Industry-specific knowledge base selection
+- Direct Azure AI Search queries (no Foundry layer)
+- Real-time query testing with configurable parameters
+- Citation and source document viewing
+
+**Use when:** You need to test knowledge bases directly, debug retrieval issues, or demonstrate pure Azure AI Search capabilities.
+
+### **2. Knowledge Management (`/knowledge`)**
+Manage knowledge bases from your Azure AI Search resource.
+
+**Key Capabilities:**
+- View all knowledge bases
+- Create new knowledge bases with diverse sources:
+  - Azure Blob Storage
+  - Azure AI Search Index
+  - Web URLs
+  - SharePoint (indexed and remote)
+  - OneLake
+- Update and configure knowledge base settings
+- Admin mode for advanced operations
+
+**Use when:** You need to manage knowledge bases and configure data sources.
+
+### **3. Playground (`/playground`)**
+Interactive playground for querying knowledge bases with full control over runtime settings.
+
+**Key Capabilities:**
+- Advanced RAG experimentation
+- Configurable retrieval parameters (reasoning effort, output mode)
+- Source-specific parameter tuning
+- Reranker threshold adjustments
+- Real-time query refinement
+
+**Use when:** You want advanced RAG experimentation, testing different retrieval strategies, or adjusting query behavior.
+
+### **4. Foundry Agents (`/agents`)**
+Azure AI Foundry Agent Service integration (production-ready managed service).
+
+**Key Capabilities:**
+- Multi-turn conversations with context retention
+- Built-in orchestration for diverse knowledge sources
+- Managed agent lifecycle
+- Production-ready scalability
+
+**Use when:** You need a production-ready managed agent service with enterprise-grade orchestration.
+
+### **5. Agents v2 API (`/api/agentsv2`) 🚧 PLACEHOLDER**
+**Status:** Placeholder for future Foundry Agents v2 integration with Knowledge Bases.
+
+**Endpoints:**
+- `/api/agentsv2/responses` - Single-call response API
+- `/api/agentsv2/connections` - Remote Tool connections management
+- `/api/agentsv2/knowledge-bases` - Knowledge Bases management for Agents v2
+
+**Note:** This is a **placeholder structure** for future integration. Not currently active in production.
+
+---
+
+## 📦 Deployment Options
+
+This application supports three deployment targets:
+
+### **1. Vercel (Primary) ✅ RECOMMENDED**
+- **Guide:** `VERCEL_DEPLOYMENT.md`, `QUICK_START_VERCEL.md`
+- **Features:** Automatic deployments, edge functions, global CDN
+- **Authentication:** Service Principal with automatic bearer token refresh
+- **Best for:** Quick deployments, global distribution, serverless scaling
+
+### **2. Azure Static Web Apps**
+- **Guide:** `AZURE_DEPLOYMENT_GUIDE.md`
+- **Script:** `deploy-to-azure.ps1` (PowerShell)
+- **Features:** Managed Identity, automatic token refresh, free SSL/HTTPS
+- **Best for:** Azure-native deployments, Managed Identity authentication
+
+### **3. Azure App Service**
+- **Guide:** Documented in `README.md`
+- **Features:** Full control, VM-based hosting, custom domains
+- **Best for:** Enterprise deployments requiring specific configurations
+
+**Deployment Helper Scripts:**
+- `deploy-to-azure.ps1` - Automated Azure Static Web Apps deployment
+- `configure-env-vars.ps1` - Environment variable configuration helper
+
+---
+
 ## ✍️ Version History
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-11-03 | 1.1.0 | Updated for agentsv2 placeholder, deployment guides, /test playground emphasis |
 | 2025-10-24 | 1.0.0 | Initial AGENTS.md creation |
 
 ---

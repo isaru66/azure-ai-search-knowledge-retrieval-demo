@@ -202,8 +202,14 @@ function Header({ onMenuClick, showSidebar }: HeaderProps) {
           
           <ThemeToggle />
           <Button variant="ghost" size="icon" aria-label="Account settings" className="rounded-full bg-glass-surface shadow-xs hover:shadow-md">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-subtle">
-              <span className="text-xs font-medium">U</span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-subtle overflow-hidden">
+              <Image 
+                src="/icons/avatar.svg" 
+                alt="User" 
+                width={28} 
+                height={28} 
+                className="object-cover"
+              />
             </div>
           </Button>
         </div>

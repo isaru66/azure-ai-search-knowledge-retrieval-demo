@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import Image from 'next/image'
 import { useRef } from 'react'
+import { useTheme } from 'next-themes'
 
 const valuePropositions = [
   {
@@ -53,17 +54,17 @@ const customerBenefits = [
 
 const knowledgeSourceTypes = [
   { name: 'Azure Blob Storage', icon: '/icons/blob.svg', category: 'Cloud Storage' },
-  { name: 'Microsoft OneLake', icon: '/icons/onelake.svg', category: 'Cloud Storage' },
+  { name: 'Microsoft OneLake', icon: '/icons/onelake-color.svg', category: 'Cloud Storage' },
   { name: 'Azure AI Search', icon: '/icons/search_icon.svg', category: 'AI & Search' },
   { name: 'MCP', icon: '/icons/mcp.svg', category: 'Protocols' },
   { name: 'Azure SQL', icon: '/icons/sql.svg', category: 'Databases' },
   { name: 'Azure Cosmos DB', icon: '/icons/cosmosdb.svg', category: 'Databases' },
-  { name: 'ADLS Gen2', icon: '/icons/adlsgen2.svg', category: 'Cloud Storage' },
-  { name: 'Azure Table Storage', icon: '/icons/blob.svg', category: 'Cloud Storage' },
+  { name: 'Fabric Knowledge', icon: '/icons/fabric_knowledge.svg', category: 'Knowledge Graph' },
+  { name: 'Fabric Data Agent', icon: '/icons/fabric.svg', category: 'AI & Search' },
   { name: 'Web', icon: '/icons/web.svg', category: 'Web & Search' },
+  { name: 'GitHub', icon: '/icons/github-mark.svg', iconDark: '/icons/github-mark-white.svg', category: 'Collaboration' },
   { name: 'SharePoint (Remote)', icon: '/icons/sharepoint.svg', category: 'Collaboration' },
   { name: 'SharePoint (Synced)', icon: '/icons/sharepoint.svg', category: 'Collaboration' },
-  { name: 'Fabric Ontology', icon: '/icons/web.svg', category: 'Knowledge Graph' }
 ]
 
 // Scroll-reveal animation component
@@ -85,6 +86,7 @@ function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; dela
 
 export function LandingPage() {
   const router = useRouter()
+  const { theme } = useTheme()
   const containerRef = useRef(null)
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -323,7 +325,7 @@ export function LandingPage() {
                   transition={{ duration: 0.5 }}
                 >
                   <Image
-                    src={source.icon}
+                    src={(source as any).iconDark && theme === 'dark' ? (source as any).iconDark : source.icon}
                     alt={source.name}
                     width={32}
                     height={32}

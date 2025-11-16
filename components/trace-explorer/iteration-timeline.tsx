@@ -58,6 +58,7 @@ export function IterationTimeline({ iterations, className }: IterationTimelinePr
                       (activity as any).azureBlobArguments?.search ||
                       (activity as any).remoteSharePointArguments?.search ||
                       (activity as any).webArguments?.search ||
+                      (activity as any).indexedOneLakeArguments?.search ||
                       ''
 
                     return (

@@ -49,7 +49,7 @@ const INDUSTRY_KNOWLEDGE_BASES: IndustryKnowledgeBase[] = [
     id: 'financial',
     name: 'Financial Knowledge Base',
     industry: 'Financial Services',
-    description: '10-Ks, 10-Qs, earnings reports, market research, analyst reports, and regulatory filings',
+    description: '10-Ks, 10-Qs, earnings reports, market research, analyst reports, regulatory filings, and financial compliance documentation',
     icon: MoneyHand20Regular,
     iconBg: 'bg-green-500/10',
     iconColor: 'text-green-600 dark:text-green-500',

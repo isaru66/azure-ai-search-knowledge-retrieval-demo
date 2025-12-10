@@ -18,6 +18,24 @@
   ],
   "sets": [
     {
+      "agentIds": ["financial-set100-knowledge-base"],
+      "starters": [
+        {
+          "id": "set100-tech-recommendation",
+          "label": "แนะนำหุ้นกลุ่มเทคโนโลยีให้หน่อย",
+          "prompt": "แนะนำหุ้นกลุ่มเทคโนโลยีให้หน่อย",
+          "complexity": "Simple",
+          "tags": ["investment"]
+        },
+        {
+          "id": "set100-bank-vs-tech-recommendation",
+          "label": "เปรียบเทียบหุ้นกลุ่มธนาคาร กับ กลุ่มเทคโนโลยี",
+          "prompt": "เปรียบเทียบหุ้นกลุ่มธนาคาร กับ กลุ่มเทคโนโลยี ฝั่งไหนน่าลงทุนมากกว่ากันในปีนี้",
+          "complexity": "Moderate",
+          "tags": ["investment"]
+        }
+      ]
+    },{
       "agentIds": ["financial-knowledge-base"],
       "starters": [
         {

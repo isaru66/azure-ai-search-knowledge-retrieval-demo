@@ -37,3 +37,6 @@ Thumbs.db
 
 # HTTP test files
 *.http
+
+# Python
+.venv/

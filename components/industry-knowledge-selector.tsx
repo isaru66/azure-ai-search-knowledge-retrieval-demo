@@ -9,6 +9,7 @@ import {
   BuildingFactory20Regular,
   HeartPulse20Regular,
   MoneyHand20Regular,
+  People20Regular,
   ShoppingBag20Regular
 } from '@fluentui/react-icons'
 import { useRouter } from 'next/navigation'
@@ -26,44 +27,35 @@ interface IndustryKnowledgeBase {
 
 const INDUSTRY_KNOWLEDGE_BASES: IndustryKnowledgeBase[] = [
   {
-    id: 'manufacturing',
-    name: 'Manufacturing Knowledge Base',
-    industry: 'Manufacturing & Supply Chain',
-    description: 'Equipment manuals, P&IDs, SOPs, safety documentation, maintenance logs, and technical specifications',
-    icon: BuildingFactory20Regular,
-    iconBg: 'bg-orange-500/10',
-    iconColor: 'text-orange-600 dark:text-orange-500',
-    agentName: 'manufacturing-knowledge-base'
-  },
-  {
-    id: 'healthcare',
-    name: 'Healthcare Knowledge Base',
-    industry: 'Healthcare & Life Sciences',
-    description: 'Clinical trial protocols, FDA filings, research papers, treatment guidelines, and patient care documentation',
-    icon: HeartPulse20Regular,
-    iconBg: 'bg-red-500/10',
-    iconColor: 'text-red-600 dark:text-red-500',
-    agentName: 'healthcare-knowledge-base'
-  },
-  {
-    id: 'financial',
-    name: 'Financial Knowledge Base',
+    id: 'financial-set100-without-bing-knowledge-base',
+    name: 'Financial Knowledge Base (Without Bing)',
     industry: 'Financial Services',
-    description: '10-Ks, 10-Qs, earnings reports, market research, analyst reports, regulatory filings, and financial compliance documentation',
+    description: 'Thai SET100 listed companies financial documents',
     icon: MoneyHand20Regular,
     iconBg: 'bg-green-500/10',
     iconColor: 'text-green-600 dark:text-green-500',
-    agentName: 'financial-knowledge-base'
+    agentName: 'financial-set100-without-bing-knowledge-base'
   },
   {
-    id: 'zava',
-    name: 'Zava Knowledge Base',
-    industry: 'Retail & Events',
-    description: 'Marathon event data, popup safety guidelines, store operations, crowd management protocols, and supply chain logistics',
-    icon: ShoppingBag20Regular,
-    iconBg: 'bg-purple-500/10',
-    iconColor: 'text-purple-600 dark:text-purple-500',
-    agentName: 'zava-knowledge-base'
+    id: 'financial-set100-knowledge-base',
+    name: 'Financial Knowledge Base with Bing',
+    industry: 'Financial Services',
+    description: 'Thai SET100 listed companies financial documents with Bing Grounding for external websearch',
+    icon: MoneyHand20Regular,
+    iconBg: 'bg-green-500/10',
+    iconColor: 'text-green-600 dark:text-green-500',
+    agentName: 'financial-set100-knowledge-base'
+  },
+  
+  {
+    id: 'hr-contoso-electric-knowledge-base',
+    name: 'HR Contoso Electric Knowledge Base',
+    industry: 'Internal HR',
+    description: 'Contoso Electric internal HR documents and policies',
+    icon: People20Regular ,
+    iconBg: 'bg-blue-500/10',
+    iconColor: 'text-blue-600 dark:text-blue-500',
+    agentName: 'hr-contoso-electric-knowledge-base'
   }
 ]
 

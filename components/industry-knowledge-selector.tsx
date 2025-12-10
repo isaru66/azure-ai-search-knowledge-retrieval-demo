@@ -48,14 +48,14 @@ const INDUSTRY_KNOWLEDGE_BASES: IndustryKnowledgeBase[] = [
   },
   
   {
-    id: 'hr-contoso-electric-knowledge-base',
+    id: 'hr-contoso-electronic-kb',
     name: 'HR Contoso Electric Knowledge Base',
     industry: 'Internal HR',
     description: 'Contoso Electric internal HR documents and policies',
     icon: People20Regular ,
     iconBg: 'bg-blue-500/10',
     iconColor: 'text-blue-600 dark:text-blue-500',
-    agentName: 'hr-contoso-electric-knowledge-base'
+    agentName: 'hr-contoso-electronic-kb'
   }
 ]
 

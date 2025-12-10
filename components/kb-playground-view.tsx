@@ -19,6 +19,9 @@ import { processImageFile } from '@/lib/imageProcessing'
 import { useConversationStarters } from '@/lib/conversationStarters'
 import { cn, formatRelativeTime, cleanTextSnippet } from '@/lib/utils'
 import { TraceExplorer } from '@/components/trace-explorer'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import {
   Select,
   SelectContent,
@@ -1104,19 +1107,159 @@ function MessageBubble({ message, agent, showCostEstimates }: { message: Message
             ? 'bg-accent text-fg-on-accent ml-12'
             : 'bg-bg-card border border-stroke-divider'
         )}>
-          <div className="prose prose-sm max-w-none space-y-3 overflow-x-auto">
+          <div className="prose prose-sm max-w-none space-y-3 overflow-x-auto dark:prose-invert">
             {message.content.map((content, index) => {
               if (content.type === 'text') {
+                // Process text to extract citation markers and render inline citations
+                const processTextWithCitations = (text: string) => {
+                  if (typeof text !== 'string') return text
+                  
+                  const parts: React.ReactNode[] = []
+                  const regex = /\[ref_id:(\d+)\]/g
+                  let lastIndex = 0
+                  let match: RegExpExecArray | null
+
+                  while ((match = regex.exec(text)) !== null) {
+                    // Add text before citation
+                    if (match.index > lastIndex) {
+                      parts.push(text.slice(lastIndex, match.index))
+                    }
+
+                    // Add citation chip
+                    const refIdx = parseInt(match[1], 10)
+                    const ref = message.references?.[refIdx]
+                    const activityEntry = ref ? message.activity?.find((a: any) => a.id === ref.activitySource) : undefined
+                    const fileName = ref?.blobUrl ? decodeURIComponent(ref.blobUrl.split('/').pop() || ref.id) : (ref?.docKey || ref?.id)
+                    const label = activityEntry?.knowledgeSourceName || fileName || `Reference ${refIdx + 1}`
+                    const citationUrl = ref?.blobUrl || (ref as any)?.webUrl || (ref as any)?.url || (ref as any)?.docUrl || ref?.docKey || null
+                    const tooltipText = citationUrl ? `${label}\n\nURL: ${citationUrl}` : label
+
+                    parts.push(
+                      <button
+                        key={`cite-${message.id}-${match.index}-${refIdx}`}
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById(`ref-${message.id}-${refIdx}`)
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            el.classList.add('ring-2','ring-accent','ring-offset-1')
+                            setTimeout(() => el.classList.remove('ring-2','ring-accent','ring-offset-1'), 1400)
+                          }
+                        }}
+                        aria-label={`View reference ${label}`}
+                        title={tooltipText}
+                        className="align-baseline inline-flex items-center gap-1 ml-1 mb-0.5 px-1.5 py-0.5 rounded bg-accent-subtle hover:bg-accent/20 hover:underline underline-offset-2 text-accent text-[10px] font-medium transition focus:outline-none focus:ring-1 focus:ring-accent max-w-[170px]"
+                      >
+                        <span className="truncate max-w-[130px]">{label}</span>
+                        <span className="text-[8px] opacity-70">#{refIdx + 1}</span>
+                      </button>
+                    )
+
+                    lastIndex = regex.lastIndex
+                  }
+
+                  // Add remaining text
+                  if (lastIndex < text.length) {
+                    parts.push(text.slice(lastIndex))
+                  }
+
+                  return parts.length > 0 ? parts : text
+                }
+
                 return (
-                  <p key={index} className="whitespace-pre-wrap break-words">
-                    <InlineCitationsText
-                      text={content.text}
-                      references={message.references}
-                      activity={message.activity}
-                      messageId={message.id}
-                      onActivate={() => {}}
-                    />
-                  </p>
+                  <div key={index} className="markdown-content">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={{
+                        // Custom components for better styling with citation processing
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-4 mb-2" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-semibold mt-3 mb-2" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-semibold mt-2 mb-1" {...props} />,
+                        h4: ({node, ...props}) => <h4 className="text-base font-semibold mt-2 mb-1" {...props} />,
+                        p: ({node, children, ...props}) => {
+                          // Process children recursively for citations
+                          const processChildren = (children: any): any => {
+                            if (typeof children === 'string') {
+                              return processTextWithCitations(children)
+                            }
+                            if (Array.isArray(children)) {
+                              return children.map((child, i) => 
+                                typeof child === 'string' ? <span key={i}>{processTextWithCitations(child)}</span> : child
+                              )
+                            }
+                            return children
+                          }
+                          
+                          return (
+                            <p className="mb-2 leading-relaxed" {...props}>
+                              {processChildren(children)}
+                            </p>
+                          )
+                        },
+                        ul: ({node, ...props}) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
+                        li: ({node, children, ...props}) => {
+                          const processChildren = (children: any): any => {
+                            if (typeof children === 'string') {
+                              return processTextWithCitations(children)
+                            }
+                            if (Array.isArray(children)) {
+                              return children.map((child, i) => 
+                                typeof child === 'string' ? <span key={i}>{processTextWithCitations(child)}</span> : child
+                              )
+                            }
+                            return children
+                          }
+                          
+                          return (
+                            <li className="ml-2" {...props}>
+                              {processChildren(children)}
+                            </li>
+                          )
+                        },
+                        code: ({node, inline, children, ...props}: any) => {
+                          const text = typeof children === 'string' ? children : String(children)
+                          return inline ? (
+                            <code className="bg-bg-subtle px-1.5 py-0.5 rounded text-sm font-mono border border-stroke-divider" {...props}>
+                              {processTextWithCitations(text)}
+                            </code>
+                          ) : (
+                            <code className="block bg-bg-subtle p-3 rounded text-sm font-mono overflow-x-auto border border-stroke-divider my-2" {...props}>
+                              {processTextWithCitations(text)}
+                            </code>
+                          )
+                        },
+                        pre: ({node, ...props}) => <pre className="bg-bg-subtle p-3 rounded overflow-x-auto my-2 border border-stroke-divider" {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-accent pl-4 italic my-2" {...props} />,
+                        table: ({node, ...props}) => <div className="overflow-x-auto my-2"><table className="min-w-full border border-stroke-divider" {...props} /></div>,
+                        th: ({node, ...props}) => <th className="border border-stroke-divider px-3 py-2 bg-bg-subtle font-semibold text-left" {...props} />,
+                        td: ({node, children, ...props}) => {
+                          const processChildren = (children: any): any => {
+                            if (typeof children === 'string') {
+                              return processTextWithCitations(children)
+                            }
+                            if (Array.isArray(children)) {
+                              return children.map((child, i) => 
+                                typeof child === 'string' ? <span key={i}>{processTextWithCitations(child)}</span> : child
+                              )
+                            }
+                            return children
+                          }
+                          
+                          return (
+                            <td className="border border-stroke-divider px-3 py-2" {...props}>
+                              {processChildren(children)}
+                            </td>
+                          )
+                        },
+                        a: ({node, ...props}) => <a className="text-accent hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                        hr: ({node, ...props}) => <hr className="my-4 border-stroke-divider" {...props} />,
+                      }}
+                    >
+                      {content.text}
+                    </ReactMarkdown>
+                  </div>
                 )
               } else if (content.type === 'image') {
                 return (

@@ -35,7 +35,60 @@
           "tags": ["investment"]
         }
       ]
-    },{
+    },
+    {
+      "agentIds": ["financial-set100-without-bing-knowledge-base"],
+      "starters": [
+        {
+          "id": "set100-tech-recommendation",
+          "label": "แนะนำหุ้นกลุ่มเทคโนโลยีให้หน่อย",
+          "prompt": "แนะนำหุ้นกลุ่มเทคโนโลยีให้หน่อย",
+          "complexity": "Simple",
+          "tags": ["investment"]
+        },
+        {
+          "id": "set100-bank-vs-tech-recommendation",
+          "label": "เปรียบเทียบหุ้นกลุ่มธนาคาร กับ กลุ่มเทคโนโลยี",
+          "prompt": "เปรียบเทียบหุ้นกลุ่มธนาคาร กับ กลุ่มเทคโนโลยี ฝั่งไหนน่าลงทุนมากกว่ากันในปีนี้",
+          "complexity": "Moderate",
+          "tags": ["investment"]
+        }
+      ]
+    },
+    {
+      "agentIds": ["hr-contoso-electronic-kb"],
+      "starters": [
+        {
+          "id": "employee-benefits-plan",
+          "label": "Northwind Health Plus Plan Benefits",
+          "prompt": "What is included in my Northwind Health Plus plan that is not in standard?",
+          "complexity": "Simple",
+          "tags": ["benefits", "hr"]
+        },
+        {
+          "id": "employee-role-library",
+          "label": "Contoso Electronic Product Manager Role",
+          "prompt": "What does a Product Manager do?",
+          "complexity": "Simple",
+          "tags": ["roles", "hr"]
+        },
+        {
+          "id": "employee-handbook-policy-1",
+          "label": "Contoso Electronic Performance Review Process",
+          "prompt": "What happens in a performance review?",
+          "complexity": "Simple",
+          "tags": ["policies", "hr"]
+        },
+        {
+          "id": "employee-handbook-policy-2",
+          "label": "Contoso Electronic Whistleblower Policy",
+          "prompt": "Whats your whistleblower policy?",
+          "complexity": "Simple",
+          "tags": ["policies", "hr"]
+        }
+      ]
+    },
+    {
       "agentIds": ["financial-knowledge-base"],
       "starters": [
         {
